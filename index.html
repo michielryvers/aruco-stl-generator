@@ -152,7 +152,7 @@
             // Create base
             const baseGeom = new THREE.BoxGeometry(sizeMm, sizeMm, baseThick);
             baseGeom.translate(sizeMm / 2, sizeMm / 2, baseThick / 2);
-            
+
             // Collect geometries for merging
             const geometries = [baseGeom];
 
@@ -171,12 +171,16 @@
                   }
                   if (hasBlackPixel) break;
                 }
-                
+
                 if (hasBlackPixel) {
-                  const box = new THREE.BoxGeometry(unit * step, unit * step, protrusion);
+                  const box = new THREE.BoxGeometry(
+                    unit * step,
+                    unit * step,
+                    protrusion
+                  );
                   box.translate(
-                    (x + step/2) * unit,
-                    (rows - y - step/2) * unit,
+                    (x + step / 2) * unit,
+                    (rows - y - step / 2) * unit,
                     baseThick + protrusion / 2
                   );
                   geometries.push(box);
@@ -186,7 +190,8 @@
 
             // Merge all geometries
             const finalGeometry = mergeGeometries(geometries);
-            const mesh = new THREE.Mesh(finalGeometry);            scene.add(mesh);
+            const mesh = new THREE.Mesh(finalGeometry);
+            scene.add(mesh);
 
             // Export as STL
             const exporter = new STLExporter();
