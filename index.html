@@ -114,7 +114,6 @@
             alert("OpenCV is not ready yet. Please wait.");
             return;
           }
-
           try {
             const dictSel = parseInt(document.getElementById("dict").value);
             const markerId = parseInt(
@@ -127,66 +126,81 @@
             );
             const protrusion = parseFloat(
               document.getElementById("protrusion").value
-            );
+            ); // Function to get the actual ArUco marker size based on dictionary
+            function getDictionarySize(dictIndex) {
+              // ArUco dictionary sizes: 4x4, 5x5, 6x6, 7x7
+              if (dictIndex >= 0 && dictIndex <= 3) return 6; // DICT_4X4_*
+              if (dictIndex >= 4 && dictIndex <= 7) return 7; // DICT_5X5_*
+              if (dictIndex >= 8 && dictIndex <= 11) return 8; // DICT_6X6_*
+              if (dictIndex >= 12 && dictIndex <= 15) return 9; // DICT_7X7_*
+              return 6; // Default fallback
+            }
 
             // Get predefined ArUco dictionary correctly
             const dictionary = cvReady.getPredefinedDictionary(dictSel);
+
+            // Generate at reasonable resolution to get clear bit pattern
+            const markerSize = getDictionarySize(dictSel); // Get the actual marker size (e.g., 6x6)
+            const renderSize = markerSize * 10; // Render at 10px per bit for clarity
             const markerImg = new cvReady.Mat();
-            dictionary.generateImageMarker(markerId, res, markerImg, 1);
+
+            try {
+              dictionary.generateImageMarker(
+                markerId,
+                renderSize,
+                markerImg,
+                1
+              );
+            } catch (openCvError) {
+              markerImg.delete();
+              throw new Error(
+                `OpenCV error generating marker: ${openCvError}. Check that marker ID ${markerId} exists in the selected dictionary.`
+              );
+            }
 
             const cols = markerImg.cols;
             const rows = markerImg.rows;
-            const bitMatrix = Array.from({ length: rows }, () =>
-              Array(cols).fill(0)
+
+            // Sample the image to get the bit pattern
+            const bitMatrix = Array.from({ length: markerSize }, () =>
+              Array(markerSize).fill(0)
             );
 
-            for (let y = 0; y < rows; y++) {
-              for (let x = 0; x < cols; x++) {
-                bitMatrix[y][x] = markerImg.ucharPtr(y, x)[0] < 128 ? 1 : 0;
+            const sampleSize = renderSize / markerSize;
+            for (let y = 0; y < markerSize; y++) {
+              for (let x = 0; x < markerSize; x++) {
+                // Sample from the center of each bit
+                const sampleY = Math.floor(y * sampleSize + sampleSize / 2);
+                const sampleX = Math.floor(x * sampleSize + sampleSize / 2);
+                bitMatrix[y][x] =
+                  markerImg.ucharPtr(sampleY, sampleX)[0] < 128 ? 1 : 0;
               }
             }
-            markerImg.delete(); // Important: free memory            // Build 3D model - simple approach with reduced complexity
+            markerImg.delete(); // Important: free memory
+
+            // Build 3D model - work with actual ArUco bit structure
             const scene = new THREE.Scene();
-            const unit = sizeMm / cols;
+            const unit = sizeMm / markerSize; // Each "bit" of the ArUco marker
 
             // Create base
             const baseGeom = new THREE.BoxGeometry(sizeMm, sizeMm, baseThick);
             baseGeom.translate(sizeMm / 2, sizeMm / 2, baseThick / 2);
 
             // Collect geometries for merging
-            const geometries = [baseGeom];
-
-            // Create protrusions for black pixels (use lower resolution for smaller files)
-            const step = Math.max(1, Math.floor(res / 50)); // Limit to ~50x50 max resolution
-            for (let y = 0; y < rows; y += step) {
-              for (let x = 0; x < cols; x += step) {
-                // Check if any pixel in this step area is black
-                let hasBlackPixel = false;
-                for (let dy = 0; dy < step && y + dy < rows; dy++) {
-                  for (let dx = 0; dx < step && x + dx < cols; dx++) {
-                    if (bitMatrix[y + dy][x + dx] === 1) {
-                      hasBlackPixel = true;
-                      break;
-                    }
-                  }
-                  if (hasBlackPixel) break;
-                }
-
-                if (hasBlackPixel) {
-                  const box = new THREE.BoxGeometry(
-                    unit * step,
-                    unit * step,
-                    protrusion
-                  );
+            const geometries = [baseGeom]; // Create protrusions for black bits (now working with actual ArUco structure)
+            bitMatrix.forEach((row, y) => {
+              row.forEach((bit, x) => {
+                if (bit === 1) {
+                  const box = new THREE.BoxGeometry(unit, unit, protrusion);
                   box.translate(
-                    (x + step / 2) * unit,
-                    (rows - y - step / 2) * unit,
+                    (x + 0.5) * unit,
+                    (markerSize - y - 0.5) * unit,
                     baseThick + protrusion / 2
                   );
                   geometries.push(box);
                 }
-              }
-            }
+              });
+            });
 
             // Merge all geometries
             const finalGeometry = mergeGeometries(geometries);
