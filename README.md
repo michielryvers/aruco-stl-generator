@@ -1,7 +1,6 @@
 # ArUco 3D STL Generator
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-brightgreen)](https://michielryvers.github.io/aruco-stl-generator/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![3D Printing](https://img.shields.io/badge/3D%20Printing-Ready-orange)](https://michielryvers.github.io/aruco-stl-generator/)
 
 > 🎯 **Generate 3D printable ArUco markers with raised patterns for computer vision and tactile applications**
