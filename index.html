@@ -5,6 +5,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aruco 3D STL Generator</title>
+  <!-- Import map to resolve bare specifiers -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.150.0/build/three.module.js"
+      }
+    }
+  </script>
   <!-- Load OpenCV.js for marker generation -->
   <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
   <!-- Load Three.js and STLExporter -->
