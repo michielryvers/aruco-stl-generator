@@ -4,33 +4,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aruco 3D STL Generator</n>
-    <!-- Load OpenCV.js for marker generation -->
-    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
-    <!-- Load Three.js and STLExporter -->
-    <script type="module">
-      import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
-      import { STLExporter } from 'https://unpkg.com/three@0.150.0/examples/jsm/exporters/STLExporter.js';
-      window.THREE = THREE;
-      window.STLExporter = STLExporter;
-    </script>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        padding: 20px;
-      }
+  <title>Aruco 3D STL Generator</title>
+  <!-- Load OpenCV.js for marker generation -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+  <!-- Load Three.js and STLExporter -->
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
+    import { STLExporter } from 'https://unpkg.com/three@0.150.0/examples/jsm/exporters/STLExporter.js';
+    window.THREE = THREE;
+    window.STLExporter = STLExporter;
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
 
-      label {
-        display: block;
-        margin-top: 10px;
-      }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
 
-      input,
-      button {
-        padding: 5px;
-        margin-top: 5px;
-      }
-    </style>
+    input,
+    button {
+      padding: 5px;
+      margin-top: 5px;
+    }
+  </style>
 </head>
 
 <body>
