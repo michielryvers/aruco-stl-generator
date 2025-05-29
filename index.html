@@ -1,154 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aruco 3D STL Generator</title>
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.176.0/build/three.module.js";
+      import { STLExporter } from "https://unpkg.com/three@0.176.0/examples/jsm/exporters/STLExporter.js?module";
+      import { mergeGeometries } from "https://unpkg.com/three@0.176.0/examples/jsm/utils/BufferGeometryUtils.js?module";
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aruco 3D STL Generator</title>
-  <!-- Import map to resolve bare specifiers -->
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.150.0/build/three.module.js"
+      /* make it global for the old inline code */
+      window.THREE = THREE;
+      window.STLExporter = STLExporter;
+      window.mergeGeometries = mergeGeometries;
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
       }
-    }
-  </script>
-  <!-- Load OpenCV.js for marker generation -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-  <!-- Load Three.js and STLExporter -->
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
-    import { STLExporter } from 'https://unpkg.com/three@0.150.0/examples/jsm/exporters/STLExporter.js';
-    window.THREE = THREE;
-    window.STLExporter = STLExporter;
-  </script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-
-    label {
-      display: block;
-      margin-top: 10px;
-    }
-
-    input,
-    button {
-      padding: 5px;
-      margin-top: 5px;
-    }
-  </style>
-</head>
-
-<body>
-  <h1>Aruco 3D STL Generator</h1>
-  <label>Dictionary:
-    <select id="dict">
-      <option value="0">DICT_4X4_50</option>
-      <option value="1">DICT_4X4_100</option>
-      <option value="2">DICT_4X4_250</option>
-      <option value="3">DICT_4X4_1000</option>
-      <option value="4">DICT_5X5_50</option>
-      <option value="5">DICT_5X5_100</option>
-      <option value="6">DICT_5X5_250</option>
-      <option value="7">DICT_5X5_1000</option>
-      <option value="8">DICT_6X6_50</option>
-      <option value="9">DICT_6X6_100</option>
-      <option value="10">DICT_6X6_250</option>
-      <option value="11">DICT_6X6_1000</option>
-      <option value="12">DICT_7X7_50</option>
-      <option value="13">DICT_7X7_100</option>
-      <option value="14">DICT_7X7_250</option>
-      <option value="15">DICT_7X7_1000</option>
-    </select>
-  </label>
-  <label>Marker ID: <input type="number" id="markerId" value="0" min="0"></label>
-  <label>Size (mm): <input type="number" id="sizeMm" value="50" min="1"></label>
-  <label>Resolution (px): <input type="number" id="res" value="200" min="10"></label>
-  <label>Base thickness (mm): <input type="number" id="baseThick" value="1.0" step="0.1"></label>
-  <label>Protrusion (mm): <input type="number" id="protrusion" value="0.4" step="0.1"></label>
-  <button id="generate">Generate STL</button>
-  <script>
-    let cvReady = false;
-    
-    function waitForOpenCV() {
-      if (typeof cv !== 'undefined') {
-        // cv is loaded, now wait for runtime initialization
-        if (cv.getBuildInformation) {
-          // OpenCV is already ready
-          cvReady = true;
-          console.log('OpenCV loaded');
-        } else {
-          // Set callback for when runtime is initialized
-          cv['onRuntimeInitialized'] = () => { 
-            cvReady = true; 
-            console.log('OpenCV loaded'); 
-          };
-        }
-      } else {
-        // cv is not loaded yet, wait and retry
-        setTimeout(waitForOpenCV, 100);
+      label {
+        display: block;
+        margin-top: 10px;
       }
-    }
-    
-    // Start checking for OpenCV availability
-    waitForOpenCV();
-
-    document.getElementById('generate').addEventListener('click', async () => {
-      if (!cvReady) { alert('OpenCV is still loading. Please wait.'); return; }
-      const dictSel = parseInt(document.getElementById('dict').value);
-      const markerId = parseInt(document.getElementById('markerId').value);
-      const sizeMm = parseFloat(document.getElementById('sizeMm').value);
-      const res = parseInt(document.getElementById('res').value);
-      const baseThick = parseFloat(document.getElementById('baseThick').value);
-      const protrusion = parseFloat(document.getElementById('protrusion').value);
-
-      // Generate ArUco marker image
-      const dictionary = new cv.aruco_Dictionary(dictSel);
-      const markerImg = new cv.Mat();
-      cv.aruco.drawMarker(dictionary, markerId, res, markerImg, 1);
-      const cols = markerImg.cols;
-      const rows = markerImg.rows;
-      // Read pixel data into 2D array
-      const bitMatrix = Array(rows).fill(0).map(() => Array(cols).fill(0));
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          bitMatrix[y][x] = markerImg.ucharPtr(y, x)[0] < 128 ? 1 : 0;
-        }
+      input,
+      button {
+        padding: 5px;
+        margin-top: 5px;
       }
-      markerImg.delete();
+      #status {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .loading {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      .ready {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Aruco 3D STL Generator</h1>
 
-      // Build 3D model
-      const scene = new THREE.Scene();
-      const unit = sizeMm / cols;
-      const baseGeom = new THREE.BoxGeometry(sizeMm, sizeMm, baseThick);
-      baseGeom.translate(sizeMm / 2, sizeMm / 2, baseThick / 2);
-      const baseMesh = new THREE.Mesh(baseGeom);
-      scene.add(baseMesh);
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          if (bitMatrix[y][x] === 1) {
-            const box = new THREE.BoxGeometry(unit, unit, protrusion);
-            box.translate((x + 0.5) * unit, (rows - y - 0.5) * unit, baseThick + protrusion / 2);
-            const mesh = new THREE.Mesh(box);
-            scene.add(mesh);
+    <p id="status" class="loading">OpenCV.js is loading...</p>
+
+    <label
+      >Dictionary:
+      <select id="dict">
+        <option value="0">DICT_4X4_50</option>
+        <option value="1">DICT_4X4_100</option>
+        <option value="2">DICT_4X4_250</option>
+        <option value="3">DICT_4X4_1000</option>
+        <option value="4">DICT_5X5_50</option>
+        <option value="5">DICT_5X5_100</option>
+        <option value="6">DICT_5X5_250</option>
+        <option value="7">DICT_5X5_1000</option>
+        <option value="8">DICT_6X6_50</option>
+        <option value="9">DICT_6X6_100</option>
+        <option value="10">DICT_6X6_250</option>
+        <option value="11">DICT_6X6_1000</option>
+        <option value="12">DICT_7X7_50</option>
+        <option value="13">DICT_7X7_100</option>
+        <option value="14">DICT_7X7_250</option>
+        <option value="15">DICT_7X7_1000</option>
+      </select>
+    </label>
+    <label
+      >Marker ID: <input type="number" id="markerId" value="0" min="0"
+    /></label>
+    <label
+      >Size (mm): <input type="number" id="sizeMm" value="50" min="1"
+    /></label>
+    <label
+      >Resolution (px): <input type="number" id="res" value="200" min="10"
+    /></label>
+    <label
+      >Base thickness (mm):
+      <input type="number" id="baseThick" value="1.0" step="0.1"
+    /></label>
+    <label
+      >Protrusion (mm):
+      <input type="number" id="protrusion" value="0.4" step="0.1"
+    /></label>
+    <button id="generate" disabled>Generate STL</button>
+
+    <script type="text/javascript">
+      // Module configuration for OpenCV.js
+      var Module = {
+        onRuntimeInitialized() {
+          console.log("OpenCV.js is ready.");
+          document.getElementById("status").innerHTML = "OpenCV.js is ready!";
+          document.getElementById("status").className = "ready";
+          document.getElementById("generate").disabled = false;
+        },
+      };
+
+      document
+        .getElementById("generate")
+        .addEventListener("click", async () => {
+          // Ensure cv is available (handle Promise if needed)
+          const cvReady = cv instanceof Promise ? await cv : cv;
+
+          if (!cvReady) {
+            alert("OpenCV is not ready yet. Please wait.");
+            return;
           }
-        }
-      }
 
-      // Export as STL
-      const exporter = new THREE.STLExporter();
-      const stlString = exporter.parse(scene);
-      const blob = new Blob([stlString], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `aruco_${dictSel}_${markerId}.stl`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-  </script>
-</body>
+          try {
+            const dictSel = parseInt(document.getElementById("dict").value);
+            const markerId = parseInt(
+              document.getElementById("markerId").value
+            );
+            const sizeMm = parseFloat(document.getElementById("sizeMm").value);
+            const res = parseInt(document.getElementById("res").value);
+            const baseThick = parseFloat(
+              document.getElementById("baseThick").value
+            );
+            const protrusion = parseFloat(
+              document.getElementById("protrusion").value
+            );
 
+            // Get predefined ArUco dictionary correctly
+            const dictionary = cvReady.getPredefinedDictionary(dictSel);
+            const markerImg = new cvReady.Mat();
+            dictionary.generateImageMarker(markerId, res, markerImg, 1);
+
+            const cols = markerImg.cols;
+            const rows = markerImg.rows;
+            const bitMatrix = Array.from({ length: rows }, () =>
+              Array(cols).fill(0)
+            );
+
+            for (let y = 0; y < rows; y++) {
+              for (let x = 0; x < cols; x++) {
+                bitMatrix[y][x] = markerImg.ucharPtr(y, x)[0] < 128 ? 1 : 0;
+              }
+            }
+            markerImg.delete(); // Important: free memory            // Build 3D model - simple approach with reduced complexity
+            const scene = new THREE.Scene();
+            const unit = sizeMm / cols;
+
+            // Create base
+            const baseGeom = new THREE.BoxGeometry(sizeMm, sizeMm, baseThick);
+            baseGeom.translate(sizeMm / 2, sizeMm / 2, baseThick / 2);
+            
+            // Collect geometries for merging
+            const geometries = [baseGeom];
+
+            // Create protrusions for black pixels (use lower resolution for smaller files)
+            const step = Math.max(1, Math.floor(res / 50)); // Limit to ~50x50 max resolution
+            for (let y = 0; y < rows; y += step) {
+              for (let x = 0; x < cols; x += step) {
+                // Check if any pixel in this step area is black
+                let hasBlackPixel = false;
+                for (let dy = 0; dy < step && y + dy < rows; dy++) {
+                  for (let dx = 0; dx < step && x + dx < cols; dx++) {
+                    if (bitMatrix[y + dy][x + dx] === 1) {
+                      hasBlackPixel = true;
+                      break;
+                    }
+                  }
+                  if (hasBlackPixel) break;
+                }
+                
+                if (hasBlackPixel) {
+                  const box = new THREE.BoxGeometry(unit * step, unit * step, protrusion);
+                  box.translate(
+                    (x + step/2) * unit,
+                    (rows - y - step/2) * unit,
+                    baseThick + protrusion / 2
+                  );
+                  geometries.push(box);
+                }
+              }
+            }
+
+            // Merge all geometries
+            const finalGeometry = mergeGeometries(geometries);
+            const mesh = new THREE.Mesh(finalGeometry);            scene.add(mesh);
+
+            // Export as STL
+            const exporter = new STLExporter();
+            const stlString = exporter.parse(scene);
+            const blob = new Blob([stlString], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `aruco_${dictSel}_${markerId}.stl`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error("Error generating STL:", error);
+            alert("Error generating STL: " + error.message);
+          }
+        });
+    </script>
+    <script async src="opencv.js" type="text/javascript"></script>
+  </body>
 </html>
