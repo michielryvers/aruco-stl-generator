@@ -102,6 +102,35 @@ npx serve .
 # Or simply open index.html in your browser
 ```
 
+## 🚀 Development & Deployment
+
+### Quick Start (Zero Setup)
+
+Just open `index.html` in your browser! The app automatically uses Tailwind CDN for local development.
+
+### Custom CSS Development
+
+If you want to modify the Tailwind styles:
+
+```bash
+# Install dependencies
+npm install
+
+# Build custom CSS (one-time)
+npm run build-css
+
+# Build custom CSS (watch mode for development)
+npm run dev
+```
+
+### Architecture
+
+- **Local Development**: Uses Tailwind CDN (fast, no build required)
+- **Production**: Uses custom built CSS (optimized, smaller bundle)
+- **Auto-Detection**: JavaScript automatically detects environment and loads appropriate CSS
+
+The project automatically builds optimized CSS for production via GitHub Actions when deployed.
+
 ## 🙏 Acknowledgments
 
 - [OpenCV.js](https://docs.opencv.org/4.x/d5/d10/tutorial_js_root.html) for computer vision functionality

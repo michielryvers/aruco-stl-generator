@@ -5,7 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ArUco 3D STL Generator</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Conditional CSS Loading: Use custom CSS in production, CDN for development -->
+    <script>
+      // Check if we're in production (GitHub Pages) or development
+      const isProduction =
+        window.location.hostname.includes("github.io") ||
+        window.location.hostname.includes("pages.dev") ||
+        window.location.protocol === "https:";
+
+      if (isProduction) {
+        // Production: Load custom built CSS
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "./dist/styles.css";
+        link.onerror = function () {
+          // Fallback to CDN if custom CSS fails to load
+          console.warn("Custom CSS failed to load, falling back to CDN");
+          const fallbackScript = document.createElement("script");
+          fallbackScript.src = "https://cdn.tailwindcss.com";
+          document.head.appendChild(fallbackScript);
+        };
+        document.head.appendChild(link);
+      } else {
+        // Development: Load Tailwind CDN
+        const script = document.createElement("script");
+        script.src = "https://cdn.tailwindcss.com";
+        document.head.appendChild(script);
+      }
+    </script>
     <script type="module">
       import * as THREE from "https://unpkg.com/three@0.176.0/build/three.module.js";
       import { STLExporter } from "https://unpkg.com/three@0.176.0/examples/jsm/exporters/STLExporter.js?module";
