@@ -1,0 +1,108 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aruco 3D STL Generator</n>
+  <!-- Load OpenCV.js for marker generation -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+  <!-- Load Three.js and STLExporter -->
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
+    import { STLExporter } from 'https://unpkg.com/three@0.150.0/examples/jsm/exporters/STLExporter.js';window.THREE = THREE;
+window.STLExporter = STLExporter;
+
+  </script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    label { display: block; margin-top: 10px; }
+    input, button { padding: 5px; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Aruco 3D STL Generator</h1>
+  <label>Dictionary:
+    <select id="dict">
+      <option value="0">DICT_4X4_50</option>
+      <option value="1">DICT_4X4_100</option>
+      <option value="2">DICT_4X4_250</option>
+      <option value="3">DICT_4X4_1000</option>
+      <option value="4">DICT_5X5_50</option>
+      <option value="5">DICT_5X5_100</option>
+      <option value="6">DICT_5X5_250</option>
+      <option value="7">DICT_5X5_1000</option>
+      <option value="8">DICT_6X6_50</option>
+      <option value="9">DICT_6X6_100</option>
+      <option value="10">DICT_6X6_250</option>
+      <option value="11">DICT_6X6_1000</option>
+      <option value="12">DICT_7X7_50</option>
+      <option value="13">DICT_7X7_100</option>
+      <option value="14">DICT_7X7_250</option>
+      <option value="15">DICT_7X7_1000</option>
+    </select>
+  </label>
+  <label>Marker ID: <input type="number" id="markerId" value="0" min="0"></label>
+  <label>Size (mm): <input type="number" id="sizeMm" value="50" min="1"></label>
+  <label>Resolution (px): <input type="number" id="res" value="200" min="10"></label>
+  <label>Base thickness (mm): <input type="number" id="baseThick" value="1.0" step="0.1"></label>
+  <label>Protrusion (mm): <input type="number" id="protrusion" value="0.4" step="0.1"></label>
+  <button id="generate">Generate STL</button>  <script>
+    let cvReady = false;
+    function onOpenCvReady() {
+      cv['onRuntimeInitialized']=()=>{ cvReady=true; console.log('OpenCV loaded'); };
+    }
+
+    document.getElementById('generate').addEventListener('click', async ()=>{
+      if(!cvReady) { alert('OpenCV is still loading. Please wait.'); return; }
+      const dictSel = parseInt(document.getElementById('dict').value);
+      const markerId = parseInt(document.getElementById('markerId').value);
+      const sizeMm = parseFloat(document.getElementById('sizeMm').value);
+      const res = parseInt(document.getElementById('res').value);
+      const baseThick = parseFloat(document.getElementById('baseThick').value);
+      const protrusion = parseFloat(document.getElementById('protrusion').value);
+
+      // Generate ArUco marker image
+      const dictionary = new cv.aruco_Dictionary(dictSel);
+      const markerImg = new cv.Mat();
+      cv.aruco.drawMarker(dictionary, markerId, res, markerImg, 1);
+      const cols = markerImg.cols;
+      const rows = markerImg.rows;
+      // Read pixel data into 2D array
+      const bitMatrix = Array(rows).fill(0).map(()=>Array(cols).fill(0));
+      for(let y=0; y<rows; y++){
+        for(let x=0; x<cols; x++){
+          bitMatrix[y][x] = markerImg.ucharPtr(y,x)[0] < 128 ? 1 : 0;
+        }
+      }
+      markerImg.delete();
+
+      // Build 3D model
+      const scene = new THREE.Scene();
+      const unit = sizeMm/cols;
+      const baseGeom = new THREE.BoxGeometry(sizeMm, sizeMm, baseThick);
+      baseGeom.translate(sizeMm/2, sizeMm/2, baseThick/2);
+      const baseMesh = new THREE.Mesh(baseGeom);
+      scene.add(baseMesh);
+      for(let y=0; y<rows; y++){
+        for(let x=0; x<cols; x++){
+          if(bitMatrix[y][x]===1){
+            const box = new THREE.BoxGeometry(unit, unit, protrusion);
+            box.translate((x+0.5)*unit, (rows-y-0.5)*unit, baseThick + protrusion/2);
+            const mesh = new THREE.Mesh(box);
+            scene.add(mesh);
+          }
+        }
+      }
+
+      // Export as STL
+      const exporter = new THREE.STLExporter();
+      const stlString = exporter.parse(scene);
+      const blob = new Blob([stlString], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `aruco_${dictSel}_${markerId}.stl`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script></body>
+</html>
