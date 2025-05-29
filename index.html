@@ -186,7 +186,8 @@
                 value="0.4"
                 step="0.1"
                 class="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />            </div>
+              />
+            </div>
 
             <!-- Border Size -->
             <div class="space-y-2">
@@ -204,7 +205,9 @@
                 min="0"
                 class="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
-              <p class="text-xs text-gray-500">Extra white border around the marker</p>
+              <p class="text-xs text-gray-500">
+                Extra white border around the marker
+              </p>
             </div>
           </div>
 
@@ -325,12 +328,13 @@
             const sizeMm = parseFloat(document.getElementById("sizeMm").value);
             const baseThick = parseFloat(
               document.getElementById("baseThick").value
-            );            const protrusion = parseFloat(
+            );
+            const protrusion = parseFloat(
               document.getElementById("protrusion").value
             );
             const borderSize = parseFloat(
               document.getElementById("borderSize").value
-            );// Function to get the actual ArUco marker size based on dictionary
+            ); // Function to get the actual ArUco marker size based on dictionary
             function getDictionarySize(dictIndex) {
               // ArUco dictionary sizes: 4x4, 5x5, 6x6, 7x7
               if (dictIndex >= 0 && dictIndex <= 3) return 6; // DICT_4X4_*
@@ -385,12 +389,16 @@
             const unit = sizeMm / markerSize; // Each "bit" of the ArUco marker
 
             // Create base with border expansion
-            const totalSize = sizeMm + (borderSize * 2); // Add border on all sides
-            const baseGeom = new THREE.BoxGeometry(totalSize, totalSize, baseThick);
+            const totalSize = sizeMm + borderSize * 2; // Add border on all sides
+            const baseGeom = new THREE.BoxGeometry(
+              totalSize,
+              totalSize,
+              baseThick
+            );
             baseGeom.translate(totalSize / 2, totalSize / 2, baseThick / 2);
 
             // Collect geometries for merging
-            const geometries = [baseGeom];            // Create protrusions for black bits (now working with actual ArUco structure)
+            const geometries = [baseGeom]; // Create protrusions for black bits (now working with actual ArUco structure)
             bitMatrix.forEach((row, y) => {
               row.forEach((bit, x) => {
                 if (bit === 1) {
