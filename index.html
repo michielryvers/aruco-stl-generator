@@ -14,7 +14,7 @@
     }
   </script>
   <!-- Load OpenCV.js for marker generation -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
   <!-- Load Three.js and STLExporter -->
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
@@ -71,9 +71,29 @@
   <button id="generate">Generate STL</button>
   <script>
     let cvReady = false;
-    function onOpenCvReady() {
-      cv['onRuntimeInitialized'] = () => { cvReady = true; console.log('OpenCV loaded'); };
+    
+    function waitForOpenCV() {
+      if (typeof cv !== 'undefined') {
+        // cv is loaded, now wait for runtime initialization
+        if (cv.getBuildInformation) {
+          // OpenCV is already ready
+          cvReady = true;
+          console.log('OpenCV loaded');
+        } else {
+          // Set callback for when runtime is initialized
+          cv['onRuntimeInitialized'] = () => { 
+            cvReady = true; 
+            console.log('OpenCV loaded'); 
+          };
+        }
+      } else {
+        // cv is not loaded yet, wait and retry
+        setTimeout(waitForOpenCV, 100);
+      }
     }
+    
+    // Start checking for OpenCV availability
+    waitForOpenCV();
 
     document.getElementById('generate').addEventListener('click', async () => {
       if (!cvReady) { alert('OpenCV is still loading. Please wait.'); return; }
