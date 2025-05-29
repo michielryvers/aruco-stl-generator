@@ -1,23 +1,38 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aruco 3D STL Generator</n>
-  <!-- Load OpenCV.js for marker generation -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
-  <!-- Load Three.js and STLExporter -->
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
-    import { STLExporter } from 'https://unpkg.com/three@0.150.0/examples/jsm/exporters/STLExporter.js';window.THREE = THREE;
-window.STLExporter = STLExporter;
+    <!-- Load OpenCV.js for marker generation -->
+    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+    <!-- Load Three.js and STLExporter -->
+    <script type="module">
+      import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
+      import { STLExporter } from 'https://unpkg.com/three@0.150.0/examples/jsm/exporters/STLExporter.js';
+      window.THREE = THREE;
+      window.STLExporter = STLExporter;
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
 
-  </script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    label { display: block; margin-top: 10px; }
-    input, button { padding: 5px; margin-top: 5px; }
-  </style>
+      label {
+        display: block;
+        margin-top: 10px;
+      }
+
+      input,
+      button {
+        padding: 5px;
+        margin-top: 5px;
+      }
+    </style>
 </head>
+
 <body>
   <h1>Aruco 3D STL Generator</h1>
   <label>Dictionary:
@@ -45,14 +60,15 @@ window.STLExporter = STLExporter;
   <label>Resolution (px): <input type="number" id="res" value="200" min="10"></label>
   <label>Base thickness (mm): <input type="number" id="baseThick" value="1.0" step="0.1"></label>
   <label>Protrusion (mm): <input type="number" id="protrusion" value="0.4" step="0.1"></label>
-  <button id="generate">Generate STL</button>  <script>
+  <button id="generate">Generate STL</button>
+  <script>
     let cvReady = false;
     function onOpenCvReady() {
-      cv['onRuntimeInitialized']=()=>{ cvReady=true; console.log('OpenCV loaded'); };
+      cv['onRuntimeInitialized'] = () => { cvReady = true; console.log('OpenCV loaded'); };
     }
 
-    document.getElementById('generate').addEventListener('click', async ()=>{
-      if(!cvReady) { alert('OpenCV is still loading. Please wait.'); return; }
+    document.getElementById('generate').addEventListener('click', async () => {
+      if (!cvReady) { alert('OpenCV is still loading. Please wait.'); return; }
       const dictSel = parseInt(document.getElementById('dict').value);
       const markerId = parseInt(document.getElementById('markerId').value);
       const sizeMm = parseFloat(document.getElementById('sizeMm').value);
@@ -67,26 +83,26 @@ window.STLExporter = STLExporter;
       const cols = markerImg.cols;
       const rows = markerImg.rows;
       // Read pixel data into 2D array
-      const bitMatrix = Array(rows).fill(0).map(()=>Array(cols).fill(0));
-      for(let y=0; y<rows; y++){
-        for(let x=0; x<cols; x++){
-          bitMatrix[y][x] = markerImg.ucharPtr(y,x)[0] < 128 ? 1 : 0;
+      const bitMatrix = Array(rows).fill(0).map(() => Array(cols).fill(0));
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          bitMatrix[y][x] = markerImg.ucharPtr(y, x)[0] < 128 ? 1 : 0;
         }
       }
       markerImg.delete();
 
       // Build 3D model
       const scene = new THREE.Scene();
-      const unit = sizeMm/cols;
+      const unit = sizeMm / cols;
       const baseGeom = new THREE.BoxGeometry(sizeMm, sizeMm, baseThick);
-      baseGeom.translate(sizeMm/2, sizeMm/2, baseThick/2);
+      baseGeom.translate(sizeMm / 2, sizeMm / 2, baseThick / 2);
       const baseMesh = new THREE.Mesh(baseGeom);
       scene.add(baseMesh);
-      for(let y=0; y<rows; y++){
-        for(let x=0; x<cols; x++){
-          if(bitMatrix[y][x]===1){
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (bitMatrix[y][x] === 1) {
             const box = new THREE.BoxGeometry(unit, unit, protrusion);
-            box.translate((x+0.5)*unit, (rows-y-0.5)*unit, baseThick + protrusion/2);
+            box.translate((x + 0.5) * unit, (rows - y - 0.5) * unit, baseThick + protrusion / 2);
             const mesh = new THREE.Mesh(box);
             scene.add(mesh);
           }
@@ -96,7 +112,7 @@ window.STLExporter = STLExporter;
       // Export as STL
       const exporter = new THREE.STLExporter();
       const stlString = exporter.parse(scene);
-      const blob = new Blob([stlString], {type: 'text/plain'});
+      const blob = new Blob([stlString], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -104,5 +120,7 @@ window.STLExporter = STLExporter;
       a.click();
       URL.revokeObjectURL(url);
     });
-  </script></body>
+  </script>
+</body>
+
 </html>
