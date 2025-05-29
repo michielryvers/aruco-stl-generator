@@ -120,22 +120,25 @@
                 <option value="15">DICT_7X7_1000</option>
               </select>
             </div>
-
-            <!-- Marker ID -->
+            <!-- Marker IDs -->
             <div class="space-y-2">
               <label
                 for="markerId"
                 class="block text-sm font-medium text-gray-700"
               >
-                Marker ID
+                Marker ID(s)
               </label>
               <input
-                type="number"
+                type="text"
                 id="markerId"
                 value="0"
-                min="0"
+                placeholder="e.g., 1, 4-6, 9 or single ID like 5"
                 class="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
+              <p class="text-xs text-gray-500">
+                Enter single ID, comma-separated list, or ranges (e.g., "1, 4-6,
+                9")
+              </p>
             </div>
 
             <!-- Size -->
@@ -334,7 +337,48 @@
             );
             const borderSize = parseFloat(
               document.getElementById("borderSize").value
-            ); // Function to get the actual ArUco marker size based on dictionary
+            );
+
+            // Function to parse marker IDs with support for ranges and comma-separated lists
+            function parseMarkerIds(input) {
+              const ids = [];
+              const parts = input.split(",").map((part) => part.trim());
+
+              for (const part of parts) {
+                if (part.includes("-")) {
+                  // Handle range (e.g., "4-6")
+                  const [start, end] = part
+                    .split("-")
+                    .map((num) => parseInt(num.trim()));
+                  if (!isNaN(start) && !isNaN(end) && start <= end) {
+                    for (let i = start; i <= end; i++) {
+                      ids.push(i);
+                    }
+                  } else {
+                    throw new Error(
+                      `Invalid range: "${part}". Use format like "4-6".`
+                    );
+                  }
+                } else {
+                  // Handle single ID
+                  const id = parseInt(part);
+                  if (!isNaN(id)) {
+                    ids.push(id);
+                  } else {
+                    throw new Error(
+                      `Invalid marker ID: "${part}". Must be a number.`
+                    );
+                  }
+                }
+              }
+
+              // Remove duplicates and sort
+              return [...new Set(ids)].sort((a, b) => a - b);
+            }
+
+            // Parse marker IDs
+            const markerIdInput = document.getElementById("markerId").value;
+            const markerIds = parseMarkerIds(markerIdInput); // Function to get the actual ArUco marker size based on dictionary
             function getDictionarySize(dictIndex) {
               // ArUco dictionary sizes: 4x4, 5x5, 6x6, 7x7
               if (dictIndex >= 0 && dictIndex <= 3) return 6; // DICT_4X4_*
@@ -342,104 +386,140 @@
               if (dictIndex >= 8 && dictIndex <= 11) return 8; // DICT_6X6_*
               if (dictIndex >= 12 && dictIndex <= 15) return 9; // DICT_7X7_*
               return 6; // Default fallback
-            }
-
-            // Get predefined ArUco dictionary correctly
+            } // Get predefined ArUco dictionary correctly
             const dictionary = cvReady.getPredefinedDictionary(dictSel);
 
             // Generate at reasonable resolution to get clear bit pattern
             const markerSize = getDictionarySize(dictSel); // Get the actual marker size (e.g., 6x6)
             const renderSize = markerSize * 10; // Render at 10px per bit for clarity
-            const markerImg = new cvReady.Mat();
 
-            try {
-              dictionary.generateImageMarker(
-                markerId,
-                renderSize,
-                markerImg,
-                1
-              );
-            } catch (openCvError) {
-              markerImg.delete();
-              throw new Error(
-                `OpenCV error generating marker: ${openCvError}. Check that marker ID ${markerId} exists in the selected dictionary.`
-              );
-            }
+            // Function to generate a single marker STL
+            function generateSingleMarker(markerId, markerIndex, totalMarkers) {
+              // Update status for current marker
+              statusElement.innerHTML = `
+                <div class="flex items-center">
+                  <svg class="animate-spin h-5 w-5 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span class="text-blue-800 font-medium">Generating marker ${markerId} (${
+                markerIndex + 1
+              }/${totalMarkers})...</span>
+                </div>
+              `;
 
-            const cols = markerImg.cols;
-            const rows = markerImg.rows;
+              const markerImg = new cvReady.Mat();
 
-            // Sample the image to get the bit pattern
-            const bitMatrix = Array.from({ length: markerSize }, () =>
-              Array(markerSize).fill(0)
-            );
-
-            const sampleSize = renderSize / markerSize;
-            for (let y = 0; y < markerSize; y++) {
-              for (let x = 0; x < markerSize; x++) {
-                // Sample from the center of each bit
-                const sampleY = Math.floor(y * sampleSize + sampleSize / 2);
-                const sampleX = Math.floor(x * sampleSize + sampleSize / 2);
-                bitMatrix[y][x] =
-                  markerImg.ucharPtr(sampleY, sampleX)[0] < 128 ? 1 : 0;
+              try {
+                dictionary.generateImageMarker(
+                  markerId,
+                  renderSize,
+                  markerImg,
+                  1
+                );
+              } catch (openCvError) {
+                markerImg.delete();
+                throw new Error(
+                  `OpenCV error generating marker ${markerId}: ${openCvError}. Check that marker ID ${markerId} exists in the selected dictionary.`
+                );
               }
-            }
-            markerImg.delete(); // Important: free memory            // Build 3D model - work with actual ArUco bit structure
-            const scene = new THREE.Scene();
-            const unit = sizeMm / markerSize; // Each "bit" of the ArUco marker
 
-            // Create base with border expansion
-            const totalSize = sizeMm + borderSize * 2; // Add border on all sides
-            const baseGeom = new THREE.BoxGeometry(
-              totalSize,
-              totalSize,
-              baseThick
-            );
-            baseGeom.translate(totalSize / 2, totalSize / 2, baseThick / 2);
+              // Sample the image to get the bit pattern
+              const bitMatrix = Array.from({ length: markerSize }, () =>
+                Array(markerSize).fill(0)
+              );
 
-            // Collect geometries for merging
-            const geometries = [baseGeom]; // Create protrusions for black bits (now working with actual ArUco structure)
-            bitMatrix.forEach((row, y) => {
-              row.forEach((bit, x) => {
-                if (bit === 1) {
-                  const box = new THREE.BoxGeometry(unit, unit, protrusion);
-                  box.translate(
-                    borderSize + (x + 0.5) * unit, // Offset by border size
-                    borderSize + (markerSize - y - 0.5) * unit, // Offset by border size
-                    baseThick + protrusion / 2
-                  );
-                  geometries.push(box);
+              const sampleSize = renderSize / markerSize;
+              for (let y = 0; y < markerSize; y++) {
+                for (let x = 0; x < markerSize; x++) {
+                  // Sample from the center of each bit
+                  const sampleY = Math.floor(y * sampleSize + sampleSize / 2);
+                  const sampleX = Math.floor(x * sampleSize + sampleSize / 2);
+                  bitMatrix[y][x] =
+                    markerImg.ucharPtr(sampleY, sampleX)[0] < 128 ? 1 : 0;
                 }
+              }
+              markerImg.delete(); // Important: free memory
+
+              // Build 3D model - work with actual ArUco bit structure
+              const scene = new THREE.Scene();
+              const unit = sizeMm / markerSize; // Each "bit" of the ArUco marker
+
+              // Create base with border expansion
+              const totalSize = sizeMm + borderSize * 2; // Add border on all sides
+              const baseGeom = new THREE.BoxGeometry(
+                totalSize,
+                totalSize,
+                baseThick
+              );
+              baseGeom.translate(totalSize / 2, totalSize / 2, baseThick / 2);
+
+              // Collect geometries for merging
+              const geometries = [baseGeom];
+
+              // Create protrusions for black bits (now working with actual ArUco structure)
+              bitMatrix.forEach((row, y) => {
+                row.forEach((bit, x) => {
+                  if (bit === 1) {
+                    const box = new THREE.BoxGeometry(unit, unit, protrusion);
+                    box.translate(
+                      borderSize + (x + 0.5) * unit, // Offset by border size
+                      borderSize + (markerSize - y - 0.5) * unit, // Offset by border size
+                      baseThick + protrusion / 2
+                    );
+                    geometries.push(box);
+                  }
+                });
               });
-            });
 
-            // Merge all geometries
-            const finalGeometry = mergeGeometries(geometries);
-            const mesh = new THREE.Mesh(finalGeometry);
-            scene.add(mesh);
+              // Merge all geometries
+              const finalGeometry = mergeGeometries(geometries);
+              const mesh = new THREE.Mesh(finalGeometry);
+              scene.add(mesh);
 
-            // Export as STL
-            const exporter = new STLExporter();
-            const stlString = exporter.parse(scene);
-            const blob = new Blob([stlString], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `aruco_${dictSel}_${markerId}.stl`;
-            a.click();
-            URL.revokeObjectURL(url);
+              // Export as STL
+              const exporter = new STLExporter();
+              const stlString = exporter.parse(scene);
+              const blob = new Blob([stlString], { type: "text/plain" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `aruco_${dictSel}_${markerId}.stl`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }
 
-            // Update status to show success
-            statusElement.innerHTML = `
-              <div class="flex items-center">
-                <svg class="h-5 w-5 text-green-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                </svg>
-                <span class="text-green-800 font-medium">STL file generated successfully! Download should start automatically.</span>
-              </div>
-            `;
-            statusElement.className =
-              "bg-green-50 border border-green-200 rounded-lg p-4";
+            // Generate all markers with a delay to prevent browser blocking
+            async function generateAllMarkers() {
+              for (let i = 0; i < markerIds.length; i++) {
+                const markerId = markerIds[i];
+                generateSingleMarker(markerId, i, markerIds.length);
+
+                // Small delay between downloads to prevent browser issues
+                if (i < markerIds.length - 1) {
+                  await new Promise((resolve) => setTimeout(resolve, 500));
+                }
+              }
+
+              // Update status to show completion
+              statusElement.innerHTML = `
+                <div class="flex items-center">
+                  <svg class="h-5 w-5 text-green-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  <span class="text-green-800 font-medium">Successfully generated ${
+                    markerIds.length
+                  } STL file${
+                markerIds.length > 1 ? "s" : ""
+              }! Downloads should complete automatically.</span>
+                </div>
+              `;
+              statusElement.className =
+                "bg-green-50 border border-green-200 rounded-lg p-4";
+            }
+
+            // Start generating all markers
+            await generateAllMarkers();
           } catch (error) {
             console.error("Error generating STL:", error);
 
